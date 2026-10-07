@@ -777,27 +777,60 @@ Generative AI gives fast answers. You must think carefully when you read AI answ
                 btnAskSocratic.disabled = true;
                 btnAskSocratic.classList.add('opacity-50');
 
+                // Reveal response box immediately with active loading indicator
+                socraticResponseBox.classList.remove('hidden');
+                socraticContent.innerHTML = `
+                    <div class="flex items-center space-x-2 py-3 text-emerald-700 font-medium animate-pulse">
+                        <div class="w-4 h-4 border-2 border-emerald-600 border-t-transparent rounded-full animate-spin"></div>
+                        <span>Gemini Socratic Partner is analyzing in ASD-STE100...</span>
+                    </div>
+                `;
+
                 const systemPrompt = "You are a Socratic coach in ASD-STE100 (Simplified Technical English). Respond to the user's idea with 3 challenging questions to test their logic. Rules: Use short sentences (less than 20 words). Use active voice. Do not praise the user. Ask direct questions.";
                 const prompt = `User's idea: "${claim}"\nGive 3 Socratic challenge questions in ASD-STE100:`;
 
                 try {
                     const responseText = await callGeminiLLM(prompt, systemPrompt);
-                    socraticResponseBox.classList.remove('hidden');
                     
-                    const formatted = responseText.split('\n')
-                        .filter(p => p.trim().length > 0)
-                        .map(p => `<p class="p-2 bg-slate-50 rounded border border-slate-100">${p}</p>`)
-                        .join('');
+                    const lines = responseText.split('\n').filter(p => p.trim().length > 0);
+                    const formatted = lines.map(p => {
+                        const cleanText = p.replace(/^[\*\-\d\.\•]+\s*/, '').trim();
+                        return `<div class="p-2.5 bg-slate-50 rounded border border-slate-200 text-slate-800 flex items-start space-x-2"><span class="text-emerald-600 font-bold">•</span><span>${escapeHtml(cleanText)}</span></div>`;
+                    }).join('');
 
-                    socraticContent.innerHTML = formatted;
+                    socraticContent.innerHTML = formatted || `<p class="p-2 text-slate-600">${escapeHtml(responseText)}</p>`;
                     showToast("Socratic questions generated!");
                 } catch (err) {
+                    console.error("Socratic API Error:", err);
+                    socraticContent.innerHTML = `
+                        <div class="p-3 bg-rose-50 text-rose-700 rounded border border-rose-200 text-xs">
+                            <strong>Error:</strong> Could not connect to Gemini AI. Please try again or check API settings.
+                        </div>
+                    `;
                     showToast("Error calling Gemini Socratic Partner.");
                 } finally {
                     btnAskSocratic.disabled = false;
                     btnAskSocratic.classList.remove('opacity-50');
                 }
             });
+
+            // Trigger Socratic check on pressing Enter in input box
+            socraticInput.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    btnAskSocratic.click();
+                }
+            });
+
+            // HTML escape helper
+            function escapeHtml(str) {
+                return String(str)
+                    .replace(/&/g, "&amp;")
+                    .replace(/</g, "&lt;")
+                    .replace(/>/g, "&gt;")
+                    .replace(/"/g, "&quot;")
+                    .replace(/'/g, "&#039;");
+            }
 
             function bindSingleCopyButtons() {
                 document.querySelectorAll('.copy-single-btn').forEach(btn => {
